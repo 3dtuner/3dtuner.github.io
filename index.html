@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Car Tuning Lab</title>
+    <title>3D Tuner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -154,8 +154,9 @@
 
     <script>
         // --- API CONFIGURATION ---
-        // apiKey is left as an empty string; the runtime environment provides the credential via the URL.
-        const apiKey = "";
+        // API Key provided by the user. This should fix the 403 error.
+        const apiKey = "AIzaSyCOs4q78FXpPL-ZOB_K9UOGsBMy4g2szCE";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
         
         // JSON Schema for structured response from the AI
         const responseSchema = {
@@ -238,9 +239,6 @@
         // --- UTILITY FUNCTIONS (API related) ---
 
         async function callGeminiAPI(payload, maxRetries = 5) {
-            // FIX: Define the apiUrl here to ensure it is correctly assembled
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetch(apiUrl, {
@@ -319,7 +317,7 @@
                 let userMessage = `<span class="text-red-400">Error: The Mechanic couldn't process that request. Check your browser console for details.`;
                 
                 if (error.message.includes("403")) {
-                     userMessage = `<span class="text-red-400">ERROR: Failed to connect to Virtual Mechanic (API Authorization Failure). Please reload the page if this persists.</span>`;
+                     userMessage = `<span class="text-red-400">ERROR: API Key/Authorization Failed. Please verify your key is correct.</span>`;
                 } else if (error.message.includes("500")) {
                      userMessage = `<span class="text-red-400">ERROR: Server error (500). Please try a simpler request or wait a moment.</span>`;
                 }
