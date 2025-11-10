@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Car Tuning Lab</title>
-    <link rel="icon" type="image/png" href="favicon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -155,8 +154,8 @@
 
     <script>
         // --- API CONFIGURATION ---
+        // apiKey is left as an empty string; the runtime environment provides the credential via the URL.
         const apiKey = "";
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
         
         // JSON Schema for structured response from the AI
         const responseSchema = {
@@ -239,6 +238,9 @@
         // --- UTILITY FUNCTIONS (API related) ---
 
         async function callGeminiAPI(payload, maxRetries = 5) {
+            // FIX: Define the apiUrl here to ensure it is correctly assembled
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetch(apiUrl, {
@@ -253,7 +255,8 @@
                         const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
                         await new Promise(resolve => setTimeout(resolve, delay));
                     } else {
-                        throw new Error(`API call failed with status: ${response.status}`);
+                        // Throw specific error for detailed reporting
+                        throw new Error(`API call failed with status: ${response.status} (${response.statusText})`);
                     }
                 } catch (error) {
                     if (i === maxRetries - 1) {
@@ -312,8 +315,18 @@
                 btnClearAiMod.style.display = 'inline-block';
 
             } catch (error) {
-                aiResponseElem.innerHTML = `<span class="text-red-400">Error: The Mechanic couldn't process that request or the part failed installation. Try a simpler upgrade.</span>`;
+                // IMPROVED ERROR MESSAGE FOR USER
+                let userMessage = `<span class="text-red-400">Error: The Mechanic couldn't process that request. Check your browser console for details.`;
+                
+                if (error.message.includes("403")) {
+                     userMessage = `<span class="text-red-400">ERROR: Failed to connect to Virtual Mechanic (API Authorization Failure). Please reload the page if this persists.</span>`;
+                } else if (error.message.includes("500")) {
+                     userMessage = `<span class="text-red-400">ERROR: Server error (500). Please try a simpler request or wait a moment.</span>`;
+                }
+
+                aiResponseElem.innerHTML = userMessage;
                 console.error("AI Request Failed:", error);
+
             } finally {
                 aiButtonText.textContent = "Request Upgrade";
                 btnAiRequest.disabled = false;
