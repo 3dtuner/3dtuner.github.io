@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Tuner</title>
+    <title>3D Car Tuning Lab</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -154,7 +154,7 @@
 
     <script>
         // --- API CONFIGURATION ---
-        // API Key provided by the user. This should fix the 403 error.
+        // API Key provided by the user.
         const apiKey = "AIzaSyCOs4q78FXpPL-ZOB_K9UOGsBMy4g2szCE";
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
         
@@ -190,6 +190,8 @@
         let isDragging = false;
         let previousMousePosition = { x: 0, y: 0 };
         let carBaseMaterial; // Defined later in init
+        let aiIndicatorTimer; // Timer for hiding the indicator
+
 
         // --- DOM Elements ---
         const statHPElem = document.getElementById('statHP');
@@ -272,6 +274,11 @@
             const userPrompt = aiInputElem.value.trim();
             if (!userPrompt) return;
 
+            // Clear any existing timer for the AI indicator
+            if (aiIndicatorTimer) {
+                clearTimeout(aiIndicatorTimer);
+                aiIndicatorTimer = null;
+            }
             clearAiMod(false);
 
             aiButtonText.textContent = "Tuning...";
@@ -309,7 +316,10 @@
                     <p class="text-sm mt-2 text-cyan-400">Stats Applied: HP ${formatChange(activeMods.aiMod.stats.hp)}, Torque ${formatChange(activeMods.aiMod.stats.torque)}, Handling ${formatChange(activeMods.aiMod.stats.handling)}</p>
                 `;
                 
+                // Show indicator briefly for 3 seconds to confirm successful AI mod application
                 toggleAIIndicator(true);
+                aiIndicatorTimer = setTimeout(() => toggleAIIndicator(false), 3000);
+
                 btnClearAiMod.style.display = 'inline-block';
 
             } catch (error) {
@@ -339,6 +349,11 @@
             activeMods.aiMod.active = false;
             activeMods.aiMod.stats = { hp: 0, torque: 0, handling: 0 };
             activeMods.aiMod.summary = "No AI upgrade installed.";
+            
+            if (aiIndicatorTimer) {
+                clearTimeout(aiIndicatorTimer);
+                aiIndicatorTimer = null;
+            }
 
             if (updateUI) {
                 updateDashboard(calculateCurrentStats());
@@ -355,6 +370,7 @@
         function toggleAIIndicator(isActive) {
             if (aiIndicatorMesh) {
                 aiIndicatorMesh.visible = isActive;
+                // Only spin when active
                 aiIndicatorMesh.rotationSpeed = isActive ? 0.05 : 0;
             }
         }
@@ -364,8 +380,9 @@
             carBaseMaterial = new THREE.MeshPhongMaterial({ color: color, shininess: 30 }); 
             // Create a brighter/tuned version of the current color
             const colorHex = new THREE.Color(color);
-            const tunedColor = colorHex.clone().multiplyScalar(1.5).getHex();
-            carTunedMaterial = new THREE.MeshPhongMaterial({ color: tunedColor, emissive: 0x660000, shininess: 80 }); 
+            // This ensures the tuned material is slightly different, simulating metallic/gloss effect
+            const tunedColor = colorHex.clone().multiplyScalar(1.2).getHex();
+            carTunedMaterial = new THREE.MeshPhongMaterial({ color: tunedColor, emissive: 0x330000, shininess: 80 }); 
         }
 
         function initThreeJS() {
@@ -380,6 +397,8 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(container3D.clientWidth, container3D.clientHeight);
             container3D.appendChild(renderer.domElement);
+            
+            // Lighting Setup
             const ambient = new THREE.AmbientLight(0x404040, 5);
             scene.add(ambient);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
@@ -444,19 +463,27 @@
                 wheels.push(wheelMesh);
             });
 
-            // 6. Spoiler
-            const spoilerBarGeometry = new THREE.BoxGeometry(0.8, 0.05, 1.2); 
-            spoilerMesh = new THREE.Mesh(spoilerBarGeometry, spoilerMaterial);
-            spoilerMesh.position.set(-1.8, 1.1, 0);
+            // 6. Spoiler Group (Fixed)
+            // Create a group for the spoiler so the components move together easily
+            const spoilerGroup = new THREE.Group();
+            spoilerGroup.position.set(-1.7, 0.7, 0); // Position the group above the rear of the car
+
+            const wingGeometry = new THREE.BoxGeometry(0.8, 0.05, 1.5); // Wider wing
+            spoilerMesh = new THREE.Mesh(wingGeometry, spoilerMaterial);
+            spoilerMesh.position.y = 0.4; // Position the wing element above the support pillars
+            spoilerGroup.add(spoilerMesh);
             
-            const supportGeom = new THREE.BoxGeometry(0.05, 0.3, 0.05);
+            const supportGeom = new THREE.BoxGeometry(0.05, 0.4, 0.05);
             const supportL = new THREE.Mesh(supportGeom, spoilerMaterial);
-            supportL.position.set(-0.35, -0.15, 0.5);
+            supportL.position.set(0.3, 0.2, 0.7); // Adjusted position relative to group
             const supportR = new THREE.Mesh(supportGeom, spoilerMaterial);
-            supportR.position.set(-0.35, -0.15, -0.5);
+            supportR.position.set(0.3, 0.2, -0.7); // Adjusted position relative to group
             
-            spoilerMesh.add(supportL);
-            spoilerMesh.add(supportR);
+            spoilerGroup.add(supportL);
+            spoilerGroup.add(supportR);
+
+            // Assign the main group to spoilerMesh variable for visibility control
+            spoilerMesh = spoilerGroup;
             spoilerMesh.visible = activeMods.spoiler; // Respect current mod state
             carGroup.add(spoilerMesh);
 
@@ -464,8 +491,9 @@
             const indicatorGeometry = new THREE.SphereGeometry(0.3, 16, 16);
             aiIndicatorMesh = new THREE.Mesh(indicatorGeometry, aiIndicatorMaterial);
             aiIndicatorMesh.position.set(2.5, 1, 0); 
-            aiIndicatorMesh.visible = activeMods.aiMod.active; // Respect current mod state
-            aiIndicatorMesh.rotationSpeed = activeMods.aiMod.active ? 0.05 : 0; 
+            // Start hidden by default
+            aiIndicatorMesh.visible = false; 
+            aiIndicatorMesh.rotationSpeed = 0; 
             carGroup.add(aiIndicatorMesh);
             
             // Apply current tune/tire visuals
@@ -509,6 +537,7 @@
                 const deltaX = e.clientX - previousMousePosition.x;
                 const deltaY = e.clientY - previousMousePosition.y;
                 carGroup.rotation.y += deltaX * 0.005;
+                // Limit rotation on X axis (up/down) to prevent flipping the car
                 carGroup.rotation.x = Math.max(-Math.PI / 8, Math.min(Math.PI / 8, carGroup.rotation.x + deltaY * 0.005));
                 previousMousePosition.x = e.clientX;
                 previousMousePosition.y = e.clientY;
