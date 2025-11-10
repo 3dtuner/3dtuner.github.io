@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Car Tuning Lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0A0A1F;
+            color: #E2E8F0;
+        }
+        #threeJsContainer {
+            width: 100%;
+            cursor: grab;
+            background-color: #1A1A3A;
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            margin-bottom: 2rem;
+            height: 400px; 
+        }
+        /* Custom Button Styling */
+        .mod-btn {
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 2px solid transparent;
+        }
+        .mod-btn.active {
+            background-color: #FACC15; /* Amber 400 */
+            color: #0A0A1F;
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.8);
+            border-color: #EAB308;
+        }
+        .mod-btn:not(.active):hover {
+            background-color: #334155;
+        }
+        .stats-card {
+            background-color: #1E293B;
+            border: 1px solid #334155;
+        }
+        #aiResponse {
+            min-height: 80px;
+            background-color: #0F172A;
+            border: 1px solid #334155;
+        }
+        .color-btn.selected {
+            border-color: #FFFFFF;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex items-center justify-center">
+
+    <div id="app" class="w-full max-w-7xl bg-slate-900 rounded-2xl shadow-2xl p-6 md:p-10 border border-slate-700">
+
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-white mb-2">
+                3D <span class="text-amber-400">Tuning</span> Lab
+            </h1>
+            <p class="text-slate-400 text-lg">Use the Virtual Mechanic to request any custom upgrade!</p>
+        </header>
+
+        <!-- 3D Car Viewport -->
+        <div id="threeJsContainer">
+            <!-- Three.js Canvas will be injected here -->
+        </div>
+
+        <!-- Main Layout: AI Assistant (Left) and Mods/Stats (Right) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- AI Virtual Mechanic Assistant (Left 2/3) -->
+            <div class="lg:col-span-2 space-y-4">
+                <h2 class="text-3xl font-bold text-cyan-400 border-b pb-2 border-slate-700">Virtual Mechanic Assistant</h2>
+                
+                <!-- Input and Buttons -->
+                <div class="flex flex-col md:flex-row gap-4">
+                    <input type="text" id="aiInput" placeholder="Request an upgrade, e.g., 'Add a huge turbo' or 'Install carbon fiber body panels'."
+                           class="flex-grow p-3 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:ring-cyan-500 focus:border-cyan-500">
+                    
+                    <button id="btnAiRequest" class="mod-btn p-3 rounded-lg text-lg font-semibold bg-cyan-600 hover:bg-cyan-700 text-white">
+                        <span id="aiButtonText">Request Upgrade</span>
+                    </button>
+                    <button id="btnClearAiMod" class="mod-btn p-3 rounded-lg text-lg font-semibold bg-red-600 hover:bg-red-700 text-white" style="display: none;">
+                        Clear AI Mod
+                    </button>
+                </div>
+
+                <!-- AI Response Display -->
+                <div>
+                    <h3 class="text-xl font-semibold mb-2 text-cyan-300">Mechanic's Report:</h3>
+                    <div id="aiResponse" class="p-4 rounded-lg text-slate-300 text-base">
+                        Ready for your custom modification request.
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Predefined Mods and Stats (Right 1/3) -->
+            <div class="lg:col-span-1 space-y-4">
+                
+                <!-- 1. Predefined Mods -->
+                <h2 class="text-3xl font-bold text-amber-400 border-b pb-2 border-slate-700">Mods & Color</h2>
+                <div class="grid grid-cols-3 gap-2 mb-4">
+                    <button id="btnSpoiler" data-mod="spoiler" class="mod-btn p-2 rounded-lg text-sm font-semibold bg-slate-700 text-white">Spoiler</button>
+                    <button id="btnTune" data-mod="tune" class="mod-btn p-2 rounded-lg text-sm font-semibold bg-slate-700 text-white">Tune</button>
+                    <button id="btnTires" data-mod="tires" class="mod-btn p-2 rounded-lg text-sm font-semibold bg-slate-700 text-white">Tires</button>
+                </div>
+
+                <!-- 2. Color Selector (NEW) -->
+                <h3 class="text-xl font-semibold mb-2 text-white">Car Color</h3>
+                <div class="flex gap-4 p-3 rounded-lg bg-slate-800 justify-around">
+                    <button id="colorRed" data-color="0xDC2626" class="color-btn selected w-12 h-12 rounded-full shadow-lg border-4 border-slate-300 bg-red-600 hover:scale-105 transition-transform"></button>
+                    <button id="colorBlue" data-color="0x3B82F6" class="color-btn w-12 h-12 rounded-full shadow-lg border-4 border-transparent bg-blue-600 hover:scale-105 transition-transform"></button>
+                    <button id="colorYellow" data-color="0xFACC15" class="color-btn w-12 h-12 rounded-full shadow-lg border-4 border-transparent bg-yellow-400 hover:scale-105 transition-transform"></button>
+                </div>
+
+                <!-- 3. Performance Dashboard -->
+                <h2 class="text-3xl font-bold pt-4 text-amber-400 border-b pb-2 border-slate-700">Performance Metrics</h2>
+                
+                <!-- Stat Card: Horsepower (HP) -->
+                <div class="stats-card p-4 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xl font-medium text-slate-300">Horsepower (HP)</span>
+                        <span id="statHP" class="text-4xl font-extrabold text-green-400">200</span>
+                    </div>
+                    <p id="hpChange" class="text-sm text-right mt-1 text-slate-400"></p>
+                </div>
+                
+                <!-- Stat Card: Torque (Lb-Ft) -->
+                <div class="stats-card p-4 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xl font-medium text-slate-300">Torque (Lb-Ft)</span>
+                        <span id="statTorque" class="text-4xl font-extrabold text-green-400">250</span>
+                    </div>
+                    <p id="torqueChange" class="text-sm text-right mt-1 text-slate-400"></p>
+                </div>
+
+                <!-- Stat Card: Handling (Score / 100) -->
+                <div class="stats-card p-4 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xl font-medium text-slate-300">Handling (Score)</span>
+                        <span id="statHandling" class="text-4xl font-extrabold text-cyan-400">50</span>
+                    </div>
+                    <p id="handlingChange" class="text-sm text-right mt-1 text-slate-400"></p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- API CONFIGURATION ---
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        
+        // JSON Schema for structured response from the AI
+        const responseSchema = {
+            type: "OBJECT",
+            properties: {
+                "upgradeName": { "type": "STRING", "description": "A concise, professional name for the upgrade requested by the user." },
+                "hpBoost": { "type": "NUMBER", "description": "The change in Horsepower (can be negative or zero)." },
+                "torqueBoost": { "type": "NUMBER", "description": "The change in Torque (can be negative or zero)." },
+                "handlingBoost": { "type": "NUMBER", "description": "The change in Handling score (can be negative or zero)." },
+                "summary": { "type": "STRING", "description": "A professional, 1-2 sentence explanation of what this upgrade does and why the stats changed, focusing on the mechanical reason." }
+            },
+            required: ["upgradeName", "hpBoost", "torqueBoost", "handlingBoost", "summary"]
+        };
+
+        const systemPrompt = `You are the Virtual Mechanic, an expert automotive engineer. Your job is to interpret the user's requested upgrade, assign realistic numerical effects to the car's performance, and explain the change professionally.
+        The current car base stats are HP: 200, Torque: 250, Handling: 50.
+        When assigning values (HP, Torque, Handling), use integers. Handling score is between 1 and 100.
+        If the upgrade is purely aesthetic, set all boosts to 0.
+        If the upgrade adds a lot of weight or significantly changes the suspension geometry (like lowering a street car), use negative numbers for handling boost.
+        If the upgrade is a major power adder (like a turbo or NOS), use large positive numbers for HP/Torque.
+        The output MUST be a JSON object conforming to the provided schema. Do not include any other text or markdown outside the JSON object.`;
+
+
+        // --- THREE.JS Variables ---
+        let scene, camera, renderer;
+        let carGroup;
+        let spoilerMesh;
+        let carParts = []; // Array to hold all car body meshes for material swapping
+        let aiIndicatorMesh;
+        let wheels = [];
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let carBaseMaterial; // Defined later in init
+
+        // --- DOM Elements ---
+        const statHPElem = document.getElementById('statHP');
+        const statTorqueElem = document.getElementById('statTorque');
+        const statHandlingElem = document.getElementById('statHandling');
+        const hpChangeElem = document.getElementById('hpChange');
+        const torqueChangeElem = document.getElementById('torqueChange');
+        const handlingChangeElem = document.getElementById('handlingChange');
+        const container3D = document.getElementById('threeJsContainer');
+        const aiInputElem = document.getElementById('aiInput');
+        const btnAiRequest = document.getElementById('btnAiRequest');
+        const btnClearAiMod = document.getElementById('btnClearAiMod');
+        const aiResponseElem = document.getElementById('aiResponse');
+        const aiButtonText = document.getElementById('aiButtonText');
+
+
+        // --- MATERIALS ---
+        // These are defined in initThreeJS to ensure they use the correct starting color
+        let carTunedMaterial; // Brighter version of the current color
+        const wheelBaseMaterial = new THREE.MeshPhongMaterial({ color: 0x333333, shininess: 5 }); // Dark Tire
+        const wheelSportMaterial = new THREE.MeshPhongMaterial({ color: 0x00A0A0, specular: 0xCCCCCC, shininess: 50 }); // Sport Tire
+        const cabinMaterial = new THREE.MeshPhongMaterial({ color: 0x334155, shininess: 10 }); // Dark Gray
+        const spoilerMaterial = new THREE.MeshPhongMaterial({ color: 0x1E293B, shininess: 20 }); // Dark Body Trim
+        const aiIndicatorMaterial = new THREE.MeshBasicMaterial({ color: 0x00FFFF, transparent: true, opacity: 0.7 });
+
+        // --- GAME LOGIC CONSTANTS and STATE ---
+        const BASE_STATS = { hp: 200, torque: 250, handling: 50 };
+        const MODS_CONFIG = {
+            spoiler: { stats: { hp: 5, torque: 0, handling: 20 } },
+            tune: { stats: { hp: 50, torque: 80, handling: -5 } },
+            tires: { stats: { hp: 0, torque: 0, handling: 30 } }
+        };
+        let activeMods = {
+            spoiler: false,
+            tune: false,
+            tires: false,
+            aiMod: {
+                active: false,
+                name: "AI Upgrade",
+                stats: { hp: 0, torque: 0, handling: 0 },
+                summary: "No AI upgrade installed."
+            },
+            currentColor: 0xDC2626 // Default Red
+        };
+
+
+        // --- UTILITY FUNCTIONS (API related) ---
+
+        async function callGeminiAPI(payload, maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        return await response.json();
+                    } else if (response.status === 429 && i < maxRetries - 1) {
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+                } catch (error) {
+                    if (i === maxRetries - 1) {
+                        throw error;
+                    }
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 500;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        // --- AI LOGIC ---
+
+        async function sendPromptToAI() {
+            const userPrompt = aiInputElem.value.trim();
+            if (!userPrompt) return;
+
+            clearAiMod(false);
+
+            aiButtonText.textContent = "Tuning...";
+            btnAiRequest.disabled = true;
+            aiResponseElem.innerHTML = '<span class="text-cyan-500">Calculating complex dynamics... please wait.</span>';
+
+            const payload = {
+                contents: [{ parts: [{ text: `I want to add the following modification to my stock car: ${userPrompt}` }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                }
+            };
+
+            try {
+                const result = await callGeminiAPI(payload);
+                
+                const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!jsonText) throw new Error("AI returned no content.");
+                
+                const parsedJson = JSON.parse(jsonText);
+                
+                activeMods.aiMod.active = true;
+                activeMods.aiMod.name = parsedJson.upgradeName;
+                activeMods.aiMod.stats.hp = parsedJson.hpBoost || 0;
+                activeMods.aiMod.stats.torque = parsedJson.torqueBoost || 0;
+                activeMods.aiMod.stats.handling = parsedJson.handlingBoost || 0;
+                activeMods.aiMod.summary = parsedJson.summary;
+
+                updateDashboard(calculateCurrentStats());
+                aiResponseElem.innerHTML = `
+                    <h4 class="font-bold text-lg text-amber-300 mb-1">${activeMods.aiMod.name} installed!</h4>
+                    <p>${activeMods.aiMod.summary}</p>
+                    <p class="text-sm mt-2 text-cyan-400">Stats Applied: HP ${formatChange(activeMods.aiMod.stats.hp)}, Torque ${formatChange(activeMods.aiMod.stats.torque)}, Handling ${formatChange(activeMods.aiMod.stats.handling)}</p>
+                `;
+                
+                toggleAIIndicator(true);
+                btnClearAiMod.style.display = 'inline-block';
+
+            } catch (error) {
+                aiResponseElem.innerHTML = `<span class="text-red-400">Error: The Mechanic couldn't process that request or the part failed installation. Try a simpler upgrade.</span>`;
+                console.error("AI Request Failed:", error);
+            } finally {
+                aiButtonText.textContent = "Request Upgrade";
+                btnAiRequest.disabled = false;
+            }
+        }
+        
+        function formatChange(value) {
+            return value >= 0 ? `+${value}` : `${value}`;
+        }
+
+        function clearAiMod(updateUI = true) {
+            activeMods.aiMod.active = false;
+            activeMods.aiMod.stats = { hp: 0, torque: 0, handling: 0 };
+            activeMods.aiMod.summary = "No AI upgrade installed.";
+
+            if (updateUI) {
+                updateDashboard(calculateCurrentStats());
+                aiResponseElem.textContent = "Ready for your custom modification request.";
+                btnClearAiMod.style.display = 'none';
+                aiInputElem.value = "";
+                toggleAIIndicator(false); 
+            }
+        }
+
+
+        // --- 3D SCENE FUNCTIONS ---
+
+        function toggleAIIndicator(isActive) {
+            if (aiIndicatorMesh) {
+                aiIndicatorMesh.visible = isActive;
+                aiIndicatorMesh.rotationSpeed = isActive ? 0.05 : 0;
+            }
+        }
+
+        function initMaterials(color) {
+            // Reinitialize the base material with the new color
+            carBaseMaterial = new THREE.MeshPhongMaterial({ color: color, shininess: 30 }); 
+            // Create a brighter/tuned version of the current color
+            const colorHex = new THREE.Color(color);
+            const tunedColor = colorHex.clone().multiplyScalar(1.5).getHex();
+            carTunedMaterial = new THREE.MeshPhongMaterial({ color: tunedColor, emissive: 0x660000, shininess: 80 }); 
+        }
+
+        function initThreeJS() {
+            // Initialize materials with default color
+            initMaterials(activeMods.currentColor);
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1A1A3A);
+            const aspectRatio = container3D.clientWidth / container3D.clientHeight;
+            camera = new THREE.PerspectiveCamera(50, aspectRatio, 0.1, 1000);
+            camera.position.set(0, 1.5, 4);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container3D.clientWidth, container3D.clientHeight);
+            container3D.appendChild(renderer.domElement);
+            const ambient = new THREE.AmbientLight(0x404040, 5);
+            scene.add(ambient);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+            directionalLight.position.set(5, 5, 5);
+            scene.add(directionalLight);
+            
+            createCar();
+            setupInteraction();
+            
+            window.addEventListener('resize', onWindowResize, false);
+            onWindowResize();
+            animate();
+        }
+
+        function createCar() {
+            carGroup = new THREE.Group();
+            scene.add(carGroup);
+            
+            // Clear existing parts before recreating (important for color changes)
+            carParts = []; 
+            wheels = [];
+
+            // 1. Main Chassis (Lower Body)
+            const chassisGeometry = new THREE.BoxGeometry(3.5, 0.4, 1.8);
+            const chassisMesh = new THREE.Mesh(chassisGeometry, carBaseMaterial);
+            chassisMesh.position.y = 0.3;
+            carGroup.add(chassisMesh);
+            carParts.push(chassisMesh);
+
+            // 2. Cabin/Roof - Slanted back for a coupe look
+            const cabinGeometry = new THREE.BoxGeometry(1.8, 0.5, 1.4);
+            const cabinMesh = new THREE.Mesh(cabinGeometry, cabinMaterial);
+            cabinMesh.position.set(0.2, 0.8, 0);
+            carGroup.add(cabinMesh);
+
+            // 3. Hood/Front Detail
+            const hoodGeometry = new THREE.BoxGeometry(0.8, 0.3, 1.6);
+            const hoodMesh = new THREE.Mesh(hoodGeometry, carBaseMaterial);
+            hoodMesh.position.set(1.5, 0.6, 0);
+            carGroup.add(hoodMesh);
+            carParts.push(hoodMesh);
+            
+            // 4. Rear Detail
+            const rearGeometry = new THREE.BoxGeometry(0.5, 0.3, 1.6);
+            const rearMesh = new THREE.Mesh(rearGeometry, carBaseMaterial);
+            rearMesh.position.set(-1.7, 0.5, 0);
+            carGroup.add(rearMesh);
+            carParts.push(rearMesh);
+
+            // 5. Wheels 
+            const wheelGeometry = new THREE.CylinderGeometry(0.35, 0.35, 0.2, 16);
+            const wheelPositions = [
+                { x: 1.2, z: 1.0 }, { x: 1.2, z: -1.0 }, 
+                { x: -1.2, z: 1.0 }, { x: -1.2, z: -1.0 }
+            ];
+
+            wheelPositions.forEach(pos => {
+                const wheelMesh = new THREE.Mesh(wheelGeometry, wheelBaseMaterial);
+                wheelMesh.rotation.x = Math.PI / 2;
+                wheelMesh.position.set(pos.x, 0.3, pos.z);
+                carGroup.add(wheelMesh);
+                wheels.push(wheelMesh);
+            });
+
+            // 6. Spoiler
+            const spoilerBarGeometry = new THREE.BoxGeometry(0.8, 0.05, 1.2); 
+            spoilerMesh = new THREE.Mesh(spoilerBarGeometry, spoilerMaterial);
+            spoilerMesh.position.set(-1.8, 1.1, 0);
+            
+            const supportGeom = new THREE.BoxGeometry(0.05, 0.3, 0.05);
+            const supportL = new THREE.Mesh(supportGeom, spoilerMaterial);
+            supportL.position.set(-0.35, -0.15, 0.5);
+            const supportR = new THREE.Mesh(supportGeom, spoilerMaterial);
+            supportR.position.set(-0.35, -0.15, -0.5);
+            
+            spoilerMesh.add(supportL);
+            spoilerMesh.add(supportR);
+            spoilerMesh.visible = activeMods.spoiler; // Respect current mod state
+            carGroup.add(spoilerMesh);
+
+            // 7. AI Mod Indicator
+            const indicatorGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+            aiIndicatorMesh = new THREE.Mesh(indicatorGeometry, aiIndicatorMaterial);
+            aiIndicatorMesh.position.set(2.5, 1, 0); 
+            aiIndicatorMesh.visible = activeMods.aiMod.active; // Respect current mod state
+            aiIndicatorMesh.rotationSpeed = activeMods.aiMod.active ? 0.05 : 0; 
+            carGroup.add(aiIndicatorMesh);
+            
+            // Apply current tune/tire visuals
+            updateVisuals('tune', activeMods.tune);
+            updateVisuals('tires', activeMods.tires);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (aiIndicatorMesh && aiIndicatorMesh.visible && aiIndicatorMesh.rotationSpeed > 0) {
+                aiIndicatorMesh.rotation.y += aiIndicatorMesh.rotationSpeed;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const width = container3D.clientWidth;
+            const height = container3D.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        function setupInteraction() {
+            container3D.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                previousMousePosition.x = e.clientX;
+                previousMousePosition.y = e.clientY;
+                container3D.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                container3D.style.cursor = 'grab';
+            });
+
+            container3D.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const deltaX = e.clientX - previousMousePosition.x;
+                const deltaY = e.clientY - previousMousePosition.y;
+                carGroup.rotation.y += deltaX * 0.005;
+                carGroup.rotation.x = Math.max(-Math.PI / 8, Math.min(Math.PI / 8, carGroup.rotation.x + deltaY * 0.005));
+                previousMousePosition.x = e.clientX;
+                previousMousePosition.y = e.clientY;
+            });
+        }
+
+
+        // --- MOD & STATS LOGIC ---
+
+        function calculateCurrentStats() {
+            let currentStats = { ...BASE_STATS };
+            let totalHPBoost = 0;
+            let totalTorqueBoost = 0;
+            let totalHandlingBoost = 0;
+
+            // 1. Predefined Mods
+            const mods = ['spoiler', 'tune', 'tires'];
+            mods.forEach(modKey => {
+                const button = document.getElementById(`btn${modKey.charAt(0).toUpperCase() + modKey.slice(1)}`);
+
+                if (activeMods[modKey]) {
+                    totalHPBoost += MODS_CONFIG[modKey].stats.hp;
+                    totalTorqueBoost += MODS_CONFIG[modKey].stats.torque;
+                    totalHandlingBoost += MODS_CONFIG[modKey].stats.handling;
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            });
+            
+            // 2. AI Mod
+            if (activeMods.aiMod.active) {
+                totalHPBoost += activeMods.aiMod.stats.hp;
+                totalTorqueBoost += activeMods.aiMod.stats.torque;
+                totalHandlingBoost += activeMods.aiMod.stats.handling;
+            }
+
+            currentStats.hp += totalHPBoost;
+            currentStats.torque += totalTorqueBoost;
+            
+            // Cap handling between 1 and 100
+            currentStats.handling = Math.max(1, Math.min(100, BASE_STATS.handling + totalHandlingBoost));
+
+            return { currentStats, totalHPBoost, totalTorqueBoost, totalHandlingBoost };
+        }
+
+        /** Updates the 3D car model visually. */
+        function updateVisuals(modKey, isActive) {
+            switch (modKey) {
+                case 'spoiler':
+                    if (spoilerMesh) spoilerMesh.visible = isActive;
+                    break;
+                case 'tune':
+                    // Tune button toggles the body material on all primary parts
+                    const material = isActive ? carTunedMaterial : carBaseMaterial;
+                    carParts.forEach(mesh => {
+                        mesh.material = material;
+                    });
+                    break;
+                case 'tires':
+                    wheels.forEach(wheel => {
+                        wheel.material = isActive ? wheelSportMaterial : wheelBaseMaterial;
+                    });
+                    break;
+            }
+        }
+
+        /** Updates the performance dashboard with new stat values. */
+        function updateDashboard(results) {
+            const { currentStats, totalHPBoost, totalTorqueBoost, totalHandlingBoost } = results;
+
+            const statsData = [
+                { key: 'hp', elem: statHPElem, changeElem: hpChangeElem, change: totalHPBoost },
+                { key: 'torque', elem: statTorqueElem, changeElem: torqueChangeElem, change: totalTorqueBoost },
+                { key: 'handling', elem: statHandlingElem, changeElem: handlingChangeElem, change: totalHandlingBoost }
+            ];
+
+            statsData.forEach(s => {
+                const value = Math.round(currentStats[s.key]);
+                
+                s.elem.textContent = value;
+                s.elem.classList.remove('text-green-400', 'text-red-400', 'text-cyan-400', 'text-slate-300');
+                
+                if (s.change > 0) {
+                    s.elem.classList.add('text-green-400');
+                    s.changeElem.textContent = `+${s.change} total boost`;
+                    s.changeElem.className = 'text-sm text-right mt-1 text-green-400';
+                } else if (s.change < 0) {
+                    s.elem.classList.add('text-red-400');
+                    s.changeElem.textContent = `${s.change} total loss`;
+                    s.changeElem.className = 'text-sm text-right mt-1 text-red-400';
+                } else {
+                    s.elem.classList.add(s.key === 'handling' ? 'text-cyan-400' : 'text-slate-300');
+                    s.changeElem.textContent = "Base stock value";
+                    s.changeElem.className = 'text-sm text-right mt-1 text-slate-400';
+                }
+            });
+        }
+
+        /** Main function to handle a mod click event. */
+        function handleModClick(event) {
+            const button = event.currentTarget;
+            const modKey = button.getAttribute('data-mod');
+
+            if (!modKey) return;
+
+            const isActive = !activeMods[modKey];
+            activeMods[modKey] = isActive;
+
+            updateVisuals(modKey, isActive);
+            updateDashboard(calculateCurrentStats());
+        }
+
+        /** Handles car color selection. */
+        function handleColorChange(event) {
+            const newColorHex = parseInt(event.currentTarget.getAttribute('data-color'), 16);
+            if (activeMods.currentColor === newColorHex) return;
+
+            // 1. Update state and materials
+            activeMods.currentColor = newColorHex;
+            initMaterials(newColorHex);
+
+            // 2. Apply new material to car body parts
+            const material = activeMods.tune ? carTunedMaterial : carBaseMaterial;
+            carParts.forEach(mesh => {
+                mesh.material = material;
+            });
+
+            // 3. Update button visuals
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                btn.style.borderColor = 'transparent';
+            });
+            event.currentTarget.classList.add('selected');
+            event.currentTarget.style.borderColor = '#FFFFFF';
+        }
+
+        /** Initialization function. */
+        function initializeGarage() {
+            // 1. Setup 3D Scene
+            initThreeJS();
+            
+            // 2. Attach Mod Listeners
+            document.querySelectorAll('.mod-btn').forEach(button => {
+                if (button.getAttribute('data-mod')) {
+                    button.addEventListener('click', handleModClick);
+                }
+            });
+
+            // 3. Attach Color Listeners
+            document.querySelectorAll('.color-btn').forEach(button => {
+                button.addEventListener('click', handleColorChange);
+                // Initial styling for the default red button
+                if (button.id === 'colorRed') {
+                    button.style.borderColor = '#FFFFFF';
+                } else {
+                    button.style.borderColor = 'transparent';
+                }
+            });
+
+            // 4. Attach AI Listeners
+            btnAiRequest.addEventListener('click', sendPromptToAI);
+            btnClearAiMod.addEventListener('click', () => clearAiMod(true));
+            aiInputElem.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendPromptToAI();
+            });
+
+            // 5. Initial dashboard setup
+            updateDashboard(calculateCurrentStats());
+        }
+
+        // Run initialization when the window loads
+        window.onload = initializeGarage;
+    </script>
+</body>
+</html>
